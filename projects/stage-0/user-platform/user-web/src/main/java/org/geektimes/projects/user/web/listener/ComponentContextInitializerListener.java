@@ -6,6 +6,8 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 
+import static org.geektimes.context.ComponentContext.CONTEXT_NAME;
+
 /**
  * {@link ComponentContext} 初始化器
  * ContextLoaderListener
@@ -14,17 +16,20 @@ public class ComponentContextInitializerListener implements ServletContextListen
 
     private ServletContext servletContext;
 
+    private ComponentContext context;
+
     @Override
     public void contextInitialized(ServletContextEvent sce) {
         this.servletContext = sce.getServletContext();
-        ComponentContext context = new ComponentContext();
+        this.context = new ComponentContext();
+        ComponentContext.setServletContext(servletContext);
+        servletContext.setAttribute(CONTEXT_NAME, context);
         context.init(servletContext);
     }
 
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
-//        ComponentContext context = ComponentContext.getInstance();
-//        context.destroy();
+        context.destroy();
     }
 
 }

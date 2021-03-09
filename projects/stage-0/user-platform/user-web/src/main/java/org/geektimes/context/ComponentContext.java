@@ -28,12 +28,9 @@ public class ComponentContext {
     // 假设一个 Tomcat JVM 进程，三个 Web Apps，会不会相互冲突？（不会冲突）
     // static 字段是 JVM 缓存吗？（是 ClassLoader 缓存）
 
-//    private static ApplicationContext applicationContext;
-
-//    public void setApplicationContext(ApplicationContext applicationContext){
-//        ComponentContext.applicationContext = applicationContext;
-//        WebApplicationContextUtils.getRootWebApplicationContext()
-//    }
+    public static void setServletContext(ServletContext servletContext) {
+        ComponentContext.servletContext = servletContext;
+    }
 
     private Context envContext; // Component Env Context
 
@@ -57,8 +54,6 @@ public class ComponentContext {
     }
 
     public void init(ServletContext servletContext) throws RuntimeException {
-        ComponentContext.servletContext = servletContext;
-        servletContext.setAttribute(CONTEXT_NAME, this);
         // 获取当前 ServletContext（WebApp）ClassLoader
         this.classLoader = servletContext.getClassLoader();
         initEnvContext();
@@ -91,8 +86,6 @@ public class ComponentContext {
             injectComponents(component, componentClass);
             // 初始阶段 - {@link PostConstruct}
             processPostConstruct(component, componentClass);
-            // TODO 实现销毁阶段 - {@link PreDestroy}
-            processPreDestroy();
         });
     }
 
@@ -131,8 +124,19 @@ public class ComponentContext {
         });
     }
 
-    private void processPreDestroy() {
-        // TODO
+    private void processPreDestroy(Object component, Class<?> componentClass) {
+        Stream.of(componentClass.getMethods())
+                .filter(method ->
+                        !Modifier.isStatic(method.getModifiers()) &&
+                        method.getParameterCount() == 0 &&
+                        method.isAnnotationPresent(PreDestroy.class))
+                .forEach(method -> {
+                    try {
+                        method.invoke(component);
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                });
     }
 
     /**
@@ -233,7 +237,7 @@ public class ComponentContext {
     }
 
     public void destroy() throws RuntimeException {
-        close(this.envContext);
+        componentsMap.values().forEach(component -> processPreDestroy(component, component.getClass()));
     }
 
     private void initEnvContext() throws RuntimeException {
